@@ -1,0 +1,31 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// model Station {
+//   rrCode  String  @id
+//   label   String
+// }
+
+// model Train {
+//   id          Int @id @default(autoincrement())
+//   freePlaces  Int
+//   origin      Station @relation(fields: [originId], references: [rrCode])
+//   originId    String
+// }
+
+model Alert {
+  id Int @id @default(autoincrement())
+  uid BigInt
+  origin String
+  destnation String
+  date DateTime
+}
