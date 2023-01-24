@@ -10,22 +10,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// model Station {
-//   rrCode  String  @id
-//   label   String
-// }
+model Station {
+  rrCode            String  @id
+  label             String
+  trainsOriginating Train[] @relation("origin")
+  trainsArriving    Train[] @relation("destination")
+}
 
-// model Train {
-//   id          Int @id @default(autoincrement())
-//   freePlaces  Int
-//   origin      Station @relation(fields: [originId], references: [rrCode])
-//   originId    String
-// }
+model Train {
+  id            Int      @id @default(autoincrement())
+  freePlaces    Int
+  number        String
+  equipment     String
+  origin        Station  @relation(name: "origin", fields: [originId], references: [rrCode])
+  originId      String
+  destination   Station  @relation(name: "destination", fields: [destinationId], references: [rrCode])
+  destinationId String
+  departure     DateTime
+  arrival       DateTime
+  alerts        Alert[]
+
+  @@unique([number, equipment, departure, arrival, originId, destinationId])
+}
 
 model Alert {
-  id Int @id @default(autoincrement())
-  uid BigInt
-  origin String
-  destnation String
-  date DateTime
+  id          Int      @id @default(autoincrement())
+  uid         Int
+  origin      String
+  destination String
+  date        DateTime
+  trains      Train[]
 }
