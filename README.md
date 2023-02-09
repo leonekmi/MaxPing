@@ -47,3 +47,5 @@ yarn watch # reconstruire l'application à chaque modification
 # Démarrer le robot
 yarn start
 ```
+
+_Source de l'icône : Ad Meskens - Own work, CC BY-SA 4.0, https://commons.wikimedia.org/w/index.php?curid=77507366_
