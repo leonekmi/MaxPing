@@ -95,16 +95,7 @@ export default function (bot: Bot) {
         await ctx.answerCallbackQuery();
         await bot.api.sendMessage(ctx.chat.id, showAlert(alert), {
           parse_mode: "HTML",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: "❌ Supprimer l'alerte",
-                  callback_data: "delete-alert-" + alert.id,
-                },
-              ],
-            ],
-          },
+          reply_markup: show_alert_menu(alert.id, 1, 0),
         });
       }
     } else if (ctx.callbackQuery.data.startsWith("change-alert-")) {
