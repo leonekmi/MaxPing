@@ -2,7 +2,7 @@
   "name": "maxping-bot",
   "version": "1.0.0",
   "description": "Y'A UN TRAIN LA CON DE TA RACE",
-  "main": "index.js",
+  "main": "dist/index.js",
   "author": "leonekmi (@leonekmi) <git@leonekmi.fr>",
   "license": "GPL-3.0",
   "private": true,
@@ -29,7 +29,9 @@
     "@typescript-eslint/parser": "^5.50.0",
     "esbuild": "^0.17.4",
     "eslint": "^8.33.0",
+    "eslint-config-prettier": "^8.6.0",
     "pino-pretty": "^9.1.1",
+    "prettier": "^2.8.4",
     "prisma": "^4.9.0"
   }
 }

@@ -21,7 +21,7 @@ En cas de problème avec le robot MaxPing, n'hésitez pas à ouvrir un ticket
 
 ## Envrionnement de développement
 
-Toutes les contributions sont acceptées ! Merci simplement de respecter les règles établies par la configuration ESLint (installer l'extension du même nom sur votre IDE devrait suffir). Également, merci de respecter la bienséance dans les discussions autour de l'application.
+Toutes les contributions sont acceptées ! Merci simplement de respecter les règles établies par la configuration ESLint (installer l'extension du même nom sur votre IDE devrait suffir) et d'utiliser Prettier (là aussi fourni par une extension de votre IDE du même nom). Également, merci de respecter la bienséance dans les discussions autour de l'application.
 
 ```sh
 # -- avant tout :
