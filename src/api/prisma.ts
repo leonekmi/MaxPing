@@ -23,7 +23,11 @@ export const getAlertsOfUser = (id: number, index?: number) =>
 export const getAlert = (id: number) =>
   prisma.alert.findUnique({
     where: { id },
-    include: { trains: true },
+    include: {
+      trains: {
+        orderBy: { departure: "asc" },
+      },
+    },
   });
 
 export const dropAlert = (id: number) =>
