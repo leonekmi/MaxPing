@@ -17,7 +17,13 @@ export const getAlertsOfUser = (id: number, index?: number) =>
     orderBy: { date: "asc" },
     skip: typeof index === "number" && index > 0 ? index : undefined,
     take: typeof index === "number" ? 1 : undefined,
-    include: { trains: true },
+    include: {
+      trains: {
+        orderBy: {
+          departure: "asc",
+        },
+      },
+    },
   });
 
 export const getAlert = (id: number) =>
