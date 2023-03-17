@@ -13,6 +13,12 @@ export const remove_keyboard: ReplyKeyboardRemove = {
   remove_keyboard: true,
 };
 
+export const alerts_menu: InlineKeyboardMarkup = {
+  inline_keyboard: [
+    [{ text: "Première alerte ▶️", callback_data: "change-alert-0" }],
+  ],
+};
+
 export const show_alert_menu = (
   alertId: number,
   alertCount: number,
@@ -45,8 +51,22 @@ export const show_alert_menu = (
       ? [
           [
             {
+              text: "◀️ Liste des alertes",
+              callback_data: "change-alert-menu",
+            },
+            {
               text: "Alerte suivante ▶️",
               callback_data: "change-alert-" + (alertIndex + 1),
+            },
+          ],
+        ]
+      : []),
+    ...(alertIndex === 0 && alertCount === 1
+      ? [
+          [
+            {
+              text: "◀️ Liste des alertes",
+              callback_data: "change-alert-menu",
             },
           ],
         ]

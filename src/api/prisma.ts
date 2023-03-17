@@ -36,6 +36,20 @@ export const getAlert = (id: number) =>
     },
   });
 
+export const getAlertIndex = async (
+  uid: number,
+  id: number
+): Promise<[number, number]> => {
+  const alerts = await prisma.alert.findMany({
+    where: { uid },
+    orderBy: { date: "asc" },
+    select: {
+      id: true,
+    },
+  });
+  return [alerts.findIndex((alert) => alert.id === id), alerts.length];
+};
+
 export const dropAlert = (id: number) =>
   prisma.alert.delete({
     where: { id },

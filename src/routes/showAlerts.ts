@@ -4,9 +4,14 @@ import {
   countAlertsOfUser,
   dropAlert,
   getAlert,
+  getAlertIndex,
 } from "../api/prisma.js";
 import { processAlert } from "../utils/diff.js";
-import { remove_keyboard, show_alert_menu } from "../utils/markups.js";
+import {
+  alerts_menu,
+  remove_keyboard,
+  show_alert_menu,
+} from "../utils/markups.js";
 import { viewAlerts, showAlert } from "../utils/messages.js";
 
 export default function (bot: Bot) {
@@ -14,7 +19,7 @@ export default function (bot: Bot) {
     const alerts = await getAlertsOfUser(ctx.chat.id);
     await ctx.reply(viewAlerts(alerts), {
       parse_mode: "HTML",
-      reply_markup: remove_keyboard,
+      reply_markup: alerts.length ? alerts_menu : remove_keyboard,
     });
   });
 
@@ -22,7 +27,13 @@ export default function (bot: Bot) {
     let alertIndex = parseInt(ctx.match);
     if (isNaN(alertIndex)) alertIndex = 0;
     const alertCount = await countAlertsOfUser(ctx.chat.id);
-    const [alert] = await getAlertsOfUser(ctx.chat.id, 0);
+    const [alert] = await getAlertsOfUser(ctx.chat.id, alertIndex);
+    if (!alert) {
+      await ctx.reply("❌ Aucune alerte trouvée", {
+        reply_markup: remove_keyboard,
+      });
+      return;
+    }
     await ctx.reply(showAlert(alert), {
       parse_mode: "HTML",
       reply_markup: show_alert_menu(alert.id, alertCount, alertIndex),
@@ -92,12 +103,32 @@ export default function (bot: Bot) {
           );
           return;
         }
+        const [alertIndex, alertCount] = await getAlertIndex(
+          ctx.chat.id,
+          alert.id
+        );
+        console.log(alertIndex, alertCount);
         await ctx.answerCallbackQuery();
-        await bot.api.sendMessage(ctx.chat.id, showAlert(alert), {
-          parse_mode: "HTML",
-          reply_markup: show_alert_menu(alert.id, 1, 0),
-        });
+        await bot.api.sendMessage(
+          ctx.chat.id,
+          showAlert(alert, alertIndex + 1),
+          {
+            parse_mode: "HTML",
+            reply_markup: show_alert_menu(alert.id, alertCount, alertIndex),
+          }
+        );
       }
+    } else if (ctx.callbackQuery.data === "change-alert-menu") {
+      const alerts = await getAlertsOfUser(ctx.chat.id);
+      await ctx.api.editMessageText(
+        ctx.chat.id,
+        ctx.callbackQuery.message.message_id,
+        viewAlerts(alerts),
+        {
+          parse_mode: "HTML",
+          reply_markup: alerts_menu,
+        }
+      );
     } else if (ctx.callbackQuery.data.startsWith("change-alert-")) {
       const alertIndex = parseInt(ctx.callbackQuery.data.slice(13));
       if (isNaN(alertIndex)) {

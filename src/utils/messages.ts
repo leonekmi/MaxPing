@@ -64,6 +64,8 @@ ${alertSkeleton(
   getStationLabel(alert.destination)
 )}`;
 
+export const cancelMessage = "🚫 La création d'alerte a été annulée";
+
 export const trainsPending = "⏳ Je cherche les trains Max...";
 
 export const createAlertStep4 = (
@@ -97,9 +99,7 @@ ${alertSkeleton(
         )
         .join("\n\n")
     : "Aucune alerte enregistrée ! Commencez avec /register_alert"
-}
-  
-<i>Utilisez /show_alert pour voir les trains liés à chaque alerte et supprimer des alertes</i>`;
+}`;
 
 // At least one train
 export const trainAlert = (trains: [Train, ...Train[]], alert: Alert) =>

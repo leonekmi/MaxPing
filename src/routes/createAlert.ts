@@ -1,4 +1,5 @@
 import {
+  cancelMessage,
   createAlertStep1,
   createAlertStep2,
   createAlertStep3,
@@ -14,19 +15,12 @@ import { getStations } from "../api/stations.js";
 import { logger } from "../utils/logger.js";
 
 export default function (bot: Bot) {
-  const pending: Partial<Alert>[] = [];
+  const pending: Map<number, Partial<Alert>> = new Map();
 
   bot.command("register_alert", async (ctx) => {
-    const pendingEntryIndex = pending.findIndex((p) => p.uid === ctx.chat.id);
-    if (pendingEntryIndex !== -1) {
-      pending[pendingEntryIndex] = {
-        uid: ctx.chat.id,
-      };
-    } else {
-      pending.push({
-        uid: ctx.chat.id,
-      });
-    }
+    pending.set(ctx.chat.id, {
+      uid: ctx.chat.id,
+    });
     await ctx.reply(createAlertStep1, {
       parse_mode: "HTML",
       reply_markup: gare,
@@ -35,7 +29,7 @@ export default function (bot: Bot) {
 
   bot.hears(/^(?:[A-Z]{5})/, async (ctx) => {
     if (!ctx.chat || !ctx.message || !ctx.message.text) return; // Channel updates, someone quits, etc.
-    const pendingEntry = pending.find((p) => p.uid === ctx.chat.id);
+    const pendingEntry = pending.get(ctx.chat.id);
     if (!pendingEntry) {
       await ctx.reply(
         "Merci de commencer par /register_alert en premier temps",
@@ -67,7 +61,7 @@ export default function (bot: Bot) {
 
   bot.hears(/(?:lun.|mar.|mer.|jeu.|ven.|sam.|dim.)/, async (ctx) => {
     if (!ctx.chat || !ctx.message || !ctx.message.text) return; // Channel updates, someone quits, etc.
-    const pendingEntry = pending.find((p) => p.uid === ctx.chat.id);
+    const pendingEntry = pending.get(ctx.chat.id);
     if (!pendingEntry) {
       await ctx.reply(
         "Merci de commencer par /register_alert en premier temps",
@@ -83,7 +77,7 @@ export default function (bot: Bot) {
         reply_markup: remove_keyboard,
       });
       await ctx.replyWithChatAction("typing");
-      const trains = await getAndCacheMaxableTrains(
+      const [trains, alertId] = await getAndCacheMaxableTrains(
         pendingEntry as Required<Alert>
       );
       logger.info({ trains }, "Alert (first) processed!");
@@ -91,7 +85,13 @@ export default function (bot: Bot) {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "Voir vos alertes", callback_data: "show-alerts" }],
+            [
+              {
+                text: "🚄 Voir les trains",
+                callback_data: "show-alert-" + alertId,
+              },
+              { text: "🔎 Voir vos alertes", callback_data: "show-alerts" },
+            ],
           ],
         },
       });
@@ -116,5 +116,10 @@ export default function (bot: Bot) {
         next_offset: "",
       }
     );
+  });
+
+  bot.command("cancel", async (ctx) => {
+    pending.delete(ctx.chat.id);
+    await ctx.reply(cancelMessage);
   });
 }

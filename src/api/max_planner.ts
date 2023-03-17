@@ -2,7 +2,7 @@ import { Alert } from "@prisma/client";
 import { formatISO } from "date-fns";
 import got from "got";
 import { prisma } from "./prisma.js";
-import { MaxableTrainsResponsePayload } from "../types/sncf.js";
+import { IMaxableTrain, MaxableTrainsResponsePayload } from "../types/sncf.js";
 import { saveTrains } from "./influxdb.js";
 
 const client = got.extend({
@@ -52,7 +52,9 @@ export async function getMaxableTrains(
   return answer.body;
 }
 
-export async function getAndCacheMaxableTrains(alert: Alert) {
+export async function getAndCacheMaxableTrains(
+  alert: Alert
+): Promise<[IMaxableTrain[], number]> {
   const { proposals = [] } = await getMaxableTrains(
     alert.origin,
     alert.destination,
@@ -147,5 +149,5 @@ export async function getAndCacheMaxableTrains(alert: Alert) {
     ...trainsSnapshot.map((t) => t.id),
     ...newTrainIDs.map((t) => t.id),
   ]);
-  return proposals;
+  return [proposals, alertId];
 }
