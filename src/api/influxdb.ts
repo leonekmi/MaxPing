@@ -13,8 +13,10 @@ export function initInflux() {
     !process.env.INFLUX_ORG ||
     !process.env.INFLUX_BUCKET
   ) {
-    logger.fatal("You should set InfluxDB env variables!");
-    process.exit(1);
+    logger.warn(
+      "You should set InfluxDB env variables to enable train logging!"
+    );
+    return;
   }
 
   const client = new InfluxDB({
@@ -44,7 +46,7 @@ function TrainToTrainPoint(train: Train) {
 export async function saveTrains(trainsIDs: number[] = []) {
   try {
     if (!api) {
-      logger.fatal("Influx not initialized");
+      logger.debug("Influx not initialized");
       return;
     }
 
