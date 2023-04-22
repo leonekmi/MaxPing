@@ -8,11 +8,11 @@ import { saveTrains } from "./influxdb.js";
 const client = got.extend({
   headers: {
     "x-client-app": "MAX_JEUNE",
-    "x-client-app-version": "1.36.3",
+    "x-client-app-version": "1.38.2",
     "x-distribution-channel": "TRAINLINE",
     // "x-syg-correlation-id": "24c77428-858e-43b4-a90c-76cd35d16917",
     "User-Agent":
-      "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/110.0",
+      "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/112.0",
     Accept: "application/json",
   },
   throwHttpErrors: false,
