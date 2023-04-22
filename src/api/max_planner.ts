@@ -2,8 +2,13 @@ import { Alert } from "@prisma/client";
 import { formatISO } from "date-fns";
 import got from "got";
 import { prisma } from "./prisma.js";
-import { IMaxableTrain, MaxableTrainsResponsePayload } from "../types/sncf.js";
+import type {
+  IMaxableTrain,
+  MaxableTrainsErrorPayload,
+  MaxableTrainsResponsePayload,
+} from "../types/sncf.js";
 import { saveTrains } from "./influxdb.js";
+import { MaxPlannerError } from "../utils/errors.js";
 
 const client = got.extend({
   headers: {
@@ -35,23 +40,34 @@ export async function getMaxableTrains(
     destination,
     origin,
   };
-  const answer = await client.post<MaxableTrainsResponsePayload>(
-    endpointGetTrains,
-    {
-      json: data,
-      responseType: "json",
-    }
-  );
-  if (answer.statusCode !== 200)
+  const answer = await client.post<
+    MaxableTrainsResponsePayload | MaxableTrainsErrorPayload
+  >(endpointGetTrains, {
+    json: data,
+    responseType: "json",
+  });
+  if (answer.statusCode !== 200) {
+    if (
+      answer.statusCode === 404 &&
+      "errorCode" in answer.body &&
+      answer.body.errorCode !== "SYG_40415" // this is the code for "No travel found at the requested dates, try something different"
+    )
+      throw new MaxPlannerError(answer.body);
     return {
       freePlacesRatio: 0,
       updatedAt: Date.now(),
       expiresAt: Date.now(),
       proposals: [],
     };
-  return answer.body;
+  }
+  return answer.body as MaxableTrainsResponsePayload;
 }
 
+/**
+ * Retrieve trains on Max backend and store it into the database
+ * @param alert The alert, it can be an existing one or a new one (it will be created in Prisma automatically)
+ * @returns A tuple with the trains and alert ID
+ */
 export async function getAndCacheMaxableTrains(
   alert: Alert
 ): Promise<[IMaxableTrain[], number]> {

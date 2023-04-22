@@ -1,9 +1,11 @@
 import {
+  alertErrorMessage,
   cancelMessage,
   createAlertStep1,
   createAlertStep2,
   createAlertStep3,
   createAlertStep4,
+  noTrainsMessage,
   trainsPending,
 } from "../utils/messages.js";
 import { Alert } from "@prisma/client";
@@ -13,6 +15,7 @@ import { getDateButtons, keyboardButtonToDate } from "../utils/date.js";
 import { getAndCacheMaxableTrains } from "../api/max_planner.js";
 import { getStations } from "../api/stations.js";
 import { logger } from "../utils/logger.js";
+import { MaxPlannerError } from "../utils/errors.js";
 
 export default function (bot: Bot) {
   const pending: Map<number, Partial<Alert>> = new Map();
@@ -77,25 +80,44 @@ export default function (bot: Bot) {
         reply_markup: remove_keyboard,
       });
       await ctx.replyWithChatAction("typing");
-      const [trains, alertId] = await getAndCacheMaxableTrains(
-        pendingEntry as Required<Alert>
-      );
-      logger.info({ trains }, "Alert (first) processed!");
-      await ctx.reply(createAlertStep4(pendingEntry, trains.length), {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "🚄 Voir les trains",
-                callback_data: "show-alert-" + alertId,
-              },
-              { text: "🔎 Voir vos alertes", callback_data: "show-alerts" },
+      try {
+        const [trains, alertId] = await getAndCacheMaxableTrains(
+          pendingEntry as Required<Alert>
+        );
+        logger.info({ trains }, "Alert (first) processed!");
+        await ctx.reply(createAlertStep4(pendingEntry, trains.length), {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🚄 Voir les trains",
+                  callback_data: "show-alert-" + alertId,
+                },
+                { text: "🔎 Voir vos alertes", callback_data: "show-alerts" },
+              ],
             ],
-          ],
-        },
-      });
-      await ctx.api.deleteMessage(message.chat.id, message.message_id);
+          },
+        });
+      } catch (err) {
+        if (err instanceof MaxPlannerError) {
+          // This code is returned when there is no eligible trains (eligible, not available)
+          if (err.code === "SYG_40416") {
+            logger.info({ err }, "No OD");
+            await ctx.reply(noTrainsMessage, {
+              parse_mode: "HTML",
+            });
+          } else {
+            logger.warn({ err }, "Unexpected Max Planner error");
+            await ctx.reply(alertErrorMessage(err), {
+              parse_mode: "HTML",
+            });
+          }
+        }
+      } finally {
+        await ctx.api.deleteMessage(message.chat.id, message.message_id);
+        pending.delete(ctx.chat.id);
+      }
     }
   });
 

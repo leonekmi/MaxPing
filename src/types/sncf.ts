@@ -31,6 +31,11 @@ export interface MaxableTrainsResponsePayload {
    * From 0 to 1, 2 decimal digits
    */
   freePlacesRatio: number;
-  
+
   proposals: IMaxableTrain[];
+}
+
+export interface MaxableTrainsErrorPayload {
+  errorCode: string;
+  message: string;
 }

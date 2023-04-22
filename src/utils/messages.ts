@@ -3,6 +3,7 @@ import { format, startOfHour } from "date-fns";
 import fr from "date-fns/locale/fr/index.js";
 import { AlertWithTrains } from "../api/prisma.js";
 import { getStationLabel } from "../api/stations.js";
+import { MaxPlannerError } from "./errors.js";
 
 const plural = (v: number, s?: string) => (v > 1 ? s || "s" : "");
 
@@ -65,6 +66,20 @@ ${alertSkeleton(
 )}`;
 
 export const cancelMessage = "🚫 La création d'alerte a été annulée";
+
+export const alertErrorMessage = (err: MaxPlannerError) =>
+  `⚠️ Le serveur SNCF a retourné un résultat inattendu
+
+<pre>${err.code}:${err.message}</pre>
+
+<i>${cancelMessage}, merci de réesayer ultérieurement, ou contactez @leonekmi pour support.</i>`;
+
+export const noTrainsMessage = `🧭 Il n'existe aucune connexion entre ces 2 gares à cette date.
+
+• Seuls les Intercités À Réservation Obligatoire (Intercités ARO), TGV INOUI et les trains OUIGO (à partir du 10 mai 2023) sont éligibles avec l'abonnement MAX JEUNE / SENIOR.
+• Vérifiez sur une application de réservation que votre itinéraire est possible sans correspondances, <i>MaxPing ne gère pas les correspondances</i>.
+
+<i>${cancelMessage}, recommencez avec /register_alert</i>`;
 
 export const trainsPending = "⏳ Je cherche les trains Max...";
 
