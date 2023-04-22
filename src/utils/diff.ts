@@ -1,6 +1,6 @@
 import { Alert, Prisma, Train } from "@prisma/client";
 import { bot } from "../index.js";
-import { prisma } from "../api/prisma.js";
+import { dropAlert, prisma } from "../api/prisma.js";
 import { getAndCacheMaxableTrains } from "../api/max_planner.js";
 import { endOfYesterday } from "date-fns";
 import { deletionAlert, trainAlert } from "./messages.js";
@@ -19,6 +19,7 @@ export async function processAlert(alert: Alert) {
   } catch (err) {
     if (err instanceof MaxPlannerError && err.code === MaxErrors.NO_OD) {
       logger.info({ alert }, "Deleting invalid alert");
+      await dropAlert(alert.id);
       await bot.api.sendMessage(alert.uid, deletionAlert(alert), {
         parse_mode: "HTML",
       });
