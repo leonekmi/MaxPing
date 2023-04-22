@@ -16,6 +16,7 @@ import { getAndCacheMaxableTrains } from "../api/max_planner.js";
 import { getStations } from "../api/stations.js";
 import { logger } from "../utils/logger.js";
 import { MaxPlannerError } from "../utils/errors.js";
+import { MaxErrors } from "../types/sncf.js";
 
 export default function (bot: Bot) {
   const pending: Map<number, Partial<Alert>> = new Map();
@@ -102,7 +103,7 @@ export default function (bot: Bot) {
       } catch (err) {
         if (err instanceof MaxPlannerError) {
           // This code is returned when there is no eligible trains (eligible, not available)
-          if (err.code === "SYG_40416") {
+          if (err.code === MaxErrors.NO_OD) {
             logger.info({ err }, "No OD");
             await ctx.reply(noTrainsMessage, {
               parse_mode: "HTML",

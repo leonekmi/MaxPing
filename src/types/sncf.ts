@@ -35,7 +35,12 @@ export interface MaxableTrainsResponsePayload {
   proposals: IMaxableTrain[];
 }
 
+export enum MaxErrors {
+  NO_AVAIL = "SYG_40415",
+  NO_OD = "SYG_40416",
+}
+
 export interface MaxableTrainsErrorPayload {
-  errorCode: string;
+  errorCode: MaxErrors;
   message: string;
 }

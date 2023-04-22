@@ -3,16 +3,28 @@ import { bot } from "../index.js";
 import { prisma } from "../api/prisma.js";
 import { getAndCacheMaxableTrains } from "../api/max_planner.js";
 import { endOfYesterday } from "date-fns";
-import { trainAlert } from "./messages.js";
+import { deletionAlert, trainAlert } from "./messages.js";
 import { logger } from "./logger.js";
+import { MaxPlannerError } from "./errors.js";
+import { MaxErrors } from "../types/sncf.js";
 
 export async function processAlert(alert: Alert) {
-  if (!("id" in alert)) throw new Error("Error not instantied");
+  if (!("id" in alert)) throw new Error("Alert not instantied");
   const { trains: trainSnapshotBefore } = await prisma.alert.findUniqueOrThrow({
     where: { id: alert.id },
     select: { trains: true },
   });
-  await getAndCacheMaxableTrains(alert);
+  try {
+    await getAndCacheMaxableTrains(alert);
+  } catch (err) {
+    if (err instanceof MaxPlannerError && err.code === MaxErrors.NO_OD) {
+      logger.info({ alert }, "Deleting invalid alert");
+      await bot.api.sendMessage(alert.uid, deletionAlert(alert), {
+        parse_mode: "HTML",
+      });
+    }
+    return;
+  }
   const { trains: trainSnapshotAfter } = await prisma.alert.findUniqueOrThrow({
     where: { id: alert.id },
     select: { trains: true },

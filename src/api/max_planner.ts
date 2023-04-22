@@ -2,10 +2,11 @@ import { Alert } from "@prisma/client";
 import { formatISO } from "date-fns";
 import got from "got";
 import { prisma } from "./prisma.js";
-import type {
+import {
   IMaxableTrain,
   MaxableTrainsErrorPayload,
   MaxableTrainsResponsePayload,
+  MaxErrors,
 } from "../types/sncf.js";
 import { saveTrains } from "./influxdb.js";
 import { MaxPlannerError } from "../utils/errors.js";
@@ -50,7 +51,7 @@ export async function getMaxableTrains(
     if (
       answer.statusCode === 404 &&
       "errorCode" in answer.body &&
-      answer.body.errorCode !== "SYG_40415" // this is the code for "No travel found at the requested dates, try something different"
+      answer.body.errorCode !== MaxErrors.NO_AVAIL // this is the code for "No travel found at the requested dates, try something different"
     )
       throw new MaxPlannerError(answer.body);
     return {

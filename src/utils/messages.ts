@@ -138,3 +138,19 @@ ${alertSkeleton(
 )}
 
 ${alert.trains.map(trainSkeleton).join("\n\n")}`;
+
+export const deletionAlert = (
+  alert: Alert
+) => `🧭 Une alerte a été supprimée, car elle ne comprend aucun itinéraire possible.
+
+${alertSkeleton(
+  getStationLabel(alert.origin),
+  getStationLabel(alert.destination),
+  alert.date.toLocaleDateString("fr"),
+  0
+)}
+
+• Seuls les Intercités À Réservation Obligatoire (Intercités ARO), TGV INOUI et les trains OUIGO (à partir du 10 mai 2023) sont éligibles avec l'abonnement MAX JEUNE / SENIOR.
+• Vérifiez sur une application de réservation que votre itinéraire est possible sans correspondances, <i>MaxPing ne gère pas les correspondances</i>.
+
+<i>MaxPing est désormais capable de détecter un itinéraire qui ne comprend aucun train éligible et prévenir l'utilisateur si tel est le cas. Si vous pensez que cette détection est erronée, merci de contacter @leonekmi avec une copie de ce message.</i>`;
