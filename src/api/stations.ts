@@ -1,5 +1,9 @@
 import stations from "../static/stations.json" assert { type: "json" };
 
+export const availableStationsCodes = stations.stations.map(
+  (s) => s.codeStation
+);
+
 export function getStations(query: string) {
   const q = query.trim().toLowerCase();
   return stations.stations

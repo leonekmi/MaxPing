@@ -13,80 +13,86 @@ import { type Bot } from "grammy";
 import { gare, remove_keyboard } from "../utils/markups.js";
 import { getDateButtons, keyboardButtonToDate } from "../utils/date.js";
 import { getAndCacheMaxableTrains } from "../api/max_planner.js";
-import { getStations } from "../api/stations.js";
+import { availableStationsCodes, getStations } from "../api/stations.js";
 import { logger } from "../utils/logger.js";
 import { MaxPlannerError } from "../utils/errors.js";
 import { MaxErrors } from "../types/sncf.js";
 
-export default function (bot: Bot) {
-  const pending: Map<number, Partial<Alert>> = new Map();
+import {
+  conversations,
+  createConversation,
+  type ConversationFn,
+} from "@grammyjs/conversations";
+import type {
+  AugmentedContext,
+  AugmentedConversation,
+} from "../types/grammy.js";
 
-  bot.command("register_alert", async (ctx) => {
-    pending.set(ctx.chat.id, {
-      uid: ctx.chat.id,
-    });
+async function askStationCode(
+  conversation: AugmentedConversation
+): Promise<string> {
+  for (;;) {
+    const ctx = await conversation.waitForHears(/^(?:[A-Z]{5})/);
+    if (!ctx.chat || !ctx.message || !ctx.message.text) continue; // Channel updates, someone quits, etc.
+    const pendingCode = ctx.message.text.slice(0, 5);
+    if (!availableStationsCodes.includes(pendingCode)) {
+      await ctx.reply("Merci de rentrer un code gare valide");
+      continue;
+    }
+    return pendingCode;
+  }
+}
+
+async function askDate(conversation: AugmentedConversation): Promise<Date> {
+  for (;;) {
+    const ctx = await conversation.waitForHears(
+      /(?:lun.|mar.|mer.|jeu.|ven.|sam.|dim.)/
+    );
+    if (!ctx.chat || !ctx.message || !ctx.message.text) continue; // Channel updates, someone quits, etc.
+    const pendingDate = keyboardButtonToDate(ctx.message.text);
+    if (!pendingDate) {
+      await ctx.reply("Merci de rentrer une date valide");
+      continue;
+    }
+    return pendingDate;
+  }
+}
+
+const createAlert: ConversationFn<AugmentedContext> =
+  async function createAlert(conversation, ctx) {
     await ctx.reply(createAlertStep1, {
       parse_mode: "HTML",
       reply_markup: gare,
     });
-  });
-
-  bot.hears(/^(?:[A-Z]{5})/, async (ctx) => {
-    if (!ctx.chat || !ctx.message || !ctx.message.text) return; // Channel updates, someone quits, etc.
-    const pendingEntry = pending.get(ctx.chat.id);
-    if (!pendingEntry) {
-      await ctx.reply(
-        "Merci de commencer par /register_alert en premier temps",
-        {
-          reply_markup: remove_keyboard,
-        }
-      );
-      return;
-    }
-    const resaRail = ctx.message.text.slice(0, 5);
-    if (!pendingEntry.origin) {
-      pendingEntry.origin = resaRail;
-      await ctx.reply(createAlertStep2(pendingEntry), {
-        parse_mode: "HTML",
-        reply_markup: gare,
-      });
-    } else if (!pendingEntry.destination) {
-      pendingEntry.destination = resaRail;
-      await ctx.reply(createAlertStep3(pendingEntry), {
-        parse_mode: "HTML",
-        reply_markup: {
-          keyboard: getDateButtons(),
-          selective: true,
-          one_time_keyboard: true,
-        },
-      });
-    }
-  });
-
-  bot.hears(/(?:lun.|mar.|mer.|jeu.|ven.|sam.|dim.)/, async (ctx) => {
-    if (!ctx.chat || !ctx.message || !ctx.message.text) return; // Channel updates, someone quits, etc.
-    const pendingEntry = pending.get(ctx.chat.id);
-    if (!pendingEntry) {
-      await ctx.reply(
-        "Merci de commencer par /register_alert en premier temps",
-        {
-          reply_markup: remove_keyboard,
-        }
-      );
-      return;
-    }
-    if (pendingEntry.origin && pendingEntry.destination && !pendingEntry.date) {
-      pendingEntry.date = keyboardButtonToDate(ctx.message.text);
-      const message = await ctx.reply(trainsPending, {
-        reply_markup: remove_keyboard,
-      });
-      await ctx.replyWithChatAction("typing");
+    const alert: Partial<Alert> = {
+      uid: ctx.chat?.id,
+    };
+    alert.origin = await askStationCode(conversation);
+    await ctx.reply(createAlertStep2(alert), {
+      parse_mode: "HTML",
+      reply_markup: gare,
+    });
+    alert.destination = await askStationCode(conversation);
+    await ctx.reply(createAlertStep3(alert), {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: getDateButtons(),
+        selective: true,
+        one_time_keyboard: true,
+      },
+    });
+    alert.date = await askDate(conversation);
+    const loadingMessage = await ctx.reply(trainsPending, {
+      reply_markup: remove_keyboard,
+    });
+    await ctx.replyWithChatAction("typing");
+    await conversation.external(async () => {
       try {
         const [trains, alertId] = await getAndCacheMaxableTrains(
-          pendingEntry as Required<Alert>
+          alert as Required<Alert>
         );
         logger.info({ trains }, "Alert (first) processed!");
-        await ctx.reply(createAlertStep4(pendingEntry, trains.length), {
+        await ctx.reply(createAlertStep4(alert, trains.length), {
           parse_mode: "HTML",
           reply_markup: {
             inline_keyboard: [
@@ -114,15 +120,20 @@ export default function (bot: Bot) {
               parse_mode: "HTML",
             });
           }
+        } else {
+          logger.error({ err }, "Unexpected error");
         }
       } finally {
-        await ctx.api.deleteMessage(message.chat.id, message.message_id);
-        pending.delete(ctx.chat.id);
+        await ctx.api.deleteMessage(
+          loadingMessage.chat.id,
+          loadingMessage.message_id
+        );
       }
-    }
-  });
+    });
+  };
 
-  bot.inlineQuery(/\w+/, async (ctx) => {
+export default function (bot: Bot<AugmentedContext>) {
+  bot.on("inline_query", async (ctx) => {
     await ctx.answerInlineQuery(
       ctx.inlineQuery.query.length > 2
         ? getStations(ctx.inlineQuery.query).map((r) => ({
@@ -141,8 +152,16 @@ export default function (bot: Bot) {
     );
   });
 
-  bot.command("cancel", async (ctx) => {
-    pending.delete(ctx.chat.id);
+  bot.use(conversations()).command("cancel", async (ctx) => {
+    await ctx.conversation.exit();
     await ctx.reply(cancelMessage);
   });
+
+  bot
+    .use(createConversation(createAlert))
+    .command("register_alert", async (ctx) => {
+      await ctx.conversation.enter("createAlert", {
+        overwrite: true,
+      });
+    });
 }

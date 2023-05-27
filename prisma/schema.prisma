@@ -41,3 +41,10 @@ model Alert {
   date        DateTime
   trains      Train[]
 }
+
+// Session key-value pairs used by grammY
+model GrammYSession {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}

@@ -6,6 +6,7 @@ import {
   getAlert,
   getAlertIndex,
 } from "../api/prisma.js";
+import type { AugmentedContext } from "../types/grammy.js";
 import { processAlert } from "../utils/diff.js";
 import {
   alerts_menu,
@@ -14,7 +15,7 @@ import {
 } from "../utils/markups.js";
 import { viewAlerts, showAlert } from "../utils/messages.js";
 
-export default function (bot: Bot) {
+export default function (bot: Bot<AugmentedContext>) {
   bot.command("show_alerts", async (ctx) => {
     const alerts = await getAlertsOfUser(ctx.chat.id);
     await ctx.reply(viewAlerts(alerts), {
@@ -107,7 +108,6 @@ export default function (bot: Bot) {
           ctx.chat.id,
           alert.id
         );
-        console.log(alertIndex, alertCount);
         await ctx.answerCallbackQuery();
         await bot.api.sendMessage(
           ctx.chat.id,

@@ -1,10 +1,11 @@
 import { type Bot } from "grammy";
 import { getAlertsOfUser } from "../api/prisma.js";
+import { AugmentedContext } from "../types/grammy.js";
 import { startProcessingLoop } from "../utils/diff.js";
 import { alerts_menu, remove_keyboard } from "../utils/markups.js";
 import { viewAlerts } from "../utils/messages.js";
 
-export default function (bot: Bot) {
+export default function (bot: Bot<AugmentedContext>) {
   startProcessingLoop();
   bot.on("callback_query:data", async (ctx, next) => {
     if (!ctx.chat || !ctx.callbackQuery.message) return;
