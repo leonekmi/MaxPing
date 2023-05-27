@@ -46,7 +46,7 @@ ${alertSkeleton("<i><b>Gare de départ</b></i>")}`;
 
 export const createAlertStep2 = (
   alert: Partial<Alert>
-) => `✏️ C'est noté pour ${alert.origin} !
+) => `✏️ C'est noté pour ${getStationLabel(alert.origin)} !
 Où va-t-on ? Dites-moi !
 <i>Il me faut le code résarail, en 5 lettres (FRXXX)</i>
 
