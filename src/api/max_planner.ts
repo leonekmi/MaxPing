@@ -1,7 +1,6 @@
-import { Alert } from "@prisma/client";
 import { formatISO } from "date-fns";
 import got from "got";
-import { prisma } from "./prisma.js";
+import { AlertWithItinerary, prisma } from "./prisma.js";
 import {
   IMaxableTrain,
   MaxableTrainsErrorPayload,
@@ -14,11 +13,11 @@ import { MaxPlannerError } from "../utils/errors.js";
 const client = got.extend({
   headers: {
     "x-client-app": "MAX_JEUNE",
-    "x-client-app-version": "1.38.2",
+    "x-client-app-version": "1.42.1",
     "x-distribution-channel": "TRAINLINE",
     // "x-syg-correlation-id": "24c77428-858e-43b4-a90c-76cd35d16917",
     "User-Agent":
-      "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/112.0",
+      "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/114.0",
     Accept: "application/json",
   },
   throwHttpErrors: false,
@@ -49,17 +48,17 @@ export async function getMaxableTrains(
   });
   if (answer.statusCode !== 200) {
     if (
-      answer.statusCode === 404 &&
       "errorCode" in answer.body &&
-      answer.body.errorCode !== MaxErrors.NO_AVAIL // this is the code for "No travel found at the requested dates, try something different"
+      answer.body.errorCode === MaxErrors.NO_AVAIL // this is the code for "No travel found at the requested dates, try something different"
     )
-      throw new MaxPlannerError(answer.body);
-    return {
-      freePlacesRatio: 0,
-      updatedAt: Date.now(),
-      expiresAt: Date.now(),
-      proposals: [],
-    };
+      return {
+        freePlacesRatio: 0,
+        updatedAt: Date.now(),
+        expiresAt: Date.now(),
+        proposals: [],
+      };
+    if ("errorCode" in answer.body) throw new MaxPlannerError(answer.body);
+    throw new Error(JSON.stringify(answer.body));
   }
   return answer.body as MaxableTrainsResponsePayload;
 }
@@ -70,38 +69,24 @@ export async function getMaxableTrains(
  * @returns A tuple with the trains and alert ID
  */
 export async function getAndCacheMaxableTrains(
-  alert: Alert
-): Promise<[IMaxableTrain[], number]> {
+  alert: AlertWithItinerary
+): Promise<IMaxableTrain[]> {
   const { proposals = [] } = await getMaxableTrains(
-    alert.origin,
-    alert.destination,
+    alert.itinerary.originId,
+    alert.itinerary.destinationId,
     alert.date
   );
-  const alertId =
-    "id" in alert
-      ? alert.id
-      : (
-          await prisma.alert.create({
-            data: alert,
-          })
-        ).id;
-  const { trains: trainsSnapshot } = await prisma.alert.findUniqueOrThrow({
+  const {
+    itinerary: { trains: trainsSnapshot },
+  } = await prisma.alert.findUniqueOrThrow({
     where: {
-      id: alertId,
+      id: alert.id,
     },
     select: {
-      trains: {
+      itinerary: {
         select: {
-          id: true,
+          trains: true,
         },
-      },
-    },
-  });
-  await prisma.alert.update({
-    where: { id: alertId },
-    data: {
-      trains: {
-        set: [],
       },
     },
   });
@@ -119,13 +104,12 @@ export async function getAndCacheMaxableTrains(
     ...proposals.map((train) =>
       prisma.train.upsert({
         where: {
-          number_equipment_departure_arrival_originId_destinationId: {
+          number_equipment_departure_arrival_itineraryId: {
             number: train.trainNumber,
+            equipment: train.trainEquipment,
             departure: new Date(train.departureDate),
             arrival: new Date(train.arrivalDate),
-            equipment: train.trainEquipment,
-            originId: train.origin.rrCode,
-            destinationId: train.destination.rrCode,
+            itineraryId: alert.itineraryId,
           },
         },
         create: {
@@ -134,27 +118,10 @@ export async function getAndCacheMaxableTrains(
           arrival: new Date(train.arrivalDate),
           equipment: train.trainEquipment,
           freePlaces: train.freePlaces,
-          destination: {
-            connectOrCreate: {
-              create: train.destination,
-              where: {
-                rrCode: train.destination.rrCode,
-              },
-            },
-          },
-          origin: {
-            connectOrCreate: {
-              create: train.origin,
-              where: {
-                rrCode: train.origin.rrCode,
-              },
-            },
-          },
-          alerts: { connect: [{ id: alertId }] },
+          itineraryId: alert.itineraryId,
         },
         update: {
           freePlaces: train.freePlaces,
-          alerts: { connect: [{ id: alertId }] },
         },
         select: {
           id: true,
@@ -166,5 +133,5 @@ export async function getAndCacheMaxableTrains(
     ...trainsSnapshot.map((t) => t.id),
     ...newTrainIDs.map((t) => t.id),
   ]);
-  return [proposals, alertId];
+  return proposals;
 }

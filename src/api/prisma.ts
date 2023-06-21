@@ -1,9 +1,19 @@
-import { Alert, PrismaClient, Train } from "@prisma/client";
+import { Alert, Itinerary, PrismaClient, Train } from "@prisma/client";
 
 export const prisma = new PrismaClient();
 
 export type AlertWithTrains = Alert & {
-  trains: Train[];
+  itinerary: Itinerary & {
+    trains: Train[];
+  };
+};
+
+export type AlertWithItinerary = Alert & {
+  itinerary: Itinerary;
+};
+
+export type TrainWithItinerary = Train & {
+  itinerary: Itinerary;
 };
 
 export const countAlertsOfUser = (id: number) =>
@@ -18,9 +28,16 @@ export const getAlertsOfUser = (id: number, index?: number) =>
     skip: typeof index === "number" && index > 0 ? index : undefined,
     take: typeof index === "number" ? 1 : undefined,
     include: {
-      trains: {
-        orderBy: {
-          departure: "asc",
+      itinerary: {
+        include: {
+          trains: {
+            orderBy: { departure: "asc" },
+            where: {
+              freePlaces: {
+                gt: 0,
+              },
+            },
+          },
         },
       },
     },
@@ -30,8 +47,17 @@ export const getAlert = (id: number) =>
   prisma.alert.findUnique({
     where: { id },
     include: {
-      trains: {
-        orderBy: { departure: "asc" },
+      itinerary: {
+        include: {
+          trains: {
+            orderBy: { departure: "asc" },
+            where: {
+              freePlaces: {
+                gt: 0,
+              },
+            },
+          },
+        },
       },
     },
   });

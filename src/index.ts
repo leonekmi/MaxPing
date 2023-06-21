@@ -9,6 +9,7 @@ import { initInflux } from "./api/influxdb.js";
 import { AugmentedContext } from "./types/grammy.js";
 import { PrismaAdapter } from "@grammyjs/storage-prisma";
 import { prisma } from "./api/prisma.js";
+import { upsertStations } from "./api/stations.js";
 
 config();
 
@@ -18,6 +19,8 @@ if (!process.env.BOT_TOKEN) {
 }
 
 initInflux();
+
+await upsertStations();
 
 export const bot = new Bot<AugmentedContext>(process.env.BOT_TOKEN);
 

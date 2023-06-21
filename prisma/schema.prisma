@@ -11,35 +11,59 @@ datasource db {
 }
 
 model Station {
-  rrCode            String  @id
-  label             String
-  trainsOriginating Train[] @relation("origin")
-  trainsArriving    Train[] @relation("destination")
+  // This model is "static".
+  // New stations are rare.
+  // Inline queries for stations are made using the JSON file found in static/
+  // as it's more performant. This data model is instead used to M2M and
+  // to assure data integrity with foreign keys
+  rrCode                 String      @id
+  label                  String
+  favoritedBy            Settings[]
+  itinerariesOriginating Itinerary[] @relation("origin")
+  itinerariesArriving    Itinerary[] @relation("destination")
 }
 
 model Train {
-  id            Int      @id @default(autoincrement())
-  freePlaces    Int
-  number        String
-  equipment     String
-  origin        Station  @relation(name: "origin", fields: [originId], references: [rrCode])
-  originId      String
-  destination   Station  @relation(name: "destination", fields: [destinationId], references: [rrCode])
-  destinationId String
-  departure     DateTime
-  arrival       DateTime
-  alerts        Alert[]
+  id          Int       @id @default(autoincrement())
+  freePlaces  Int
+  number      String
+  equipment   String
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id])
+  itineraryId Int
+  departure   DateTime
+  arrival     DateTime
 
-  @@unique([number, equipment, departure, arrival, originId, destinationId])
+  @@unique([number, equipment, departure, arrival, itineraryId])
+}
+
+model Itinerary {
+  id            Int        @id @default(autoincrement())
+  origin        Station    @relation(name: "origin", fields: [originId], references: [rrCode])
+  originId      String
+  destination   Station    @relation(name: "destination", fields: [destinationId], references: [rrCode])
+  destinationId String
+  alerts        Alert[]
+  favoritedBy   Settings[]
+  trains        Train[]
+
+  @@unique([originId, destinationId])
 }
 
 model Alert {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   uid         Int
-  origin      String
-  destination String
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id])
   date        DateTime
-  trains      Train[]
+  itineraryId Int
+}
+
+model Settings {
+  id                   Int         @id @default(autoincrement())
+  uid                  Int
+  favorite_stops       Station[]
+  favorite_itineraries Itinerary[]
+  created_at           DateTime    @default(now())
+  updated_at           DateTime    @updatedAt
 }
 
 // Session key-value pairs used by grammY

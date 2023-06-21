@@ -1,6 +1,6 @@
-import { Alert, Prisma, Train } from "@prisma/client";
+import { Prisma, Train } from "@prisma/client";
 import { bot } from "../index.js";
-import { dropAlert, prisma } from "../api/prisma.js";
+import { AlertWithItinerary, dropAlert, prisma } from "../api/prisma.js";
 import { getAndCacheMaxableTrains } from "../api/max_planner.js";
 import { endOfYesterday } from "date-fns";
 import { deletionAlert, trainAlert } from "./messages.js";
@@ -8,11 +8,25 @@ import { logger } from "./logger.js";
 import { MaxPlannerError } from "./errors.js";
 import { MaxErrors } from "../types/sncf.js";
 
-export async function processAlert(alert: Alert) {
+export async function processAlert(alert: AlertWithItinerary) {
   if (!("id" in alert)) throw new Error("Alert not instantied");
-  const { trains: trainSnapshotBefore } = await prisma.alert.findUniqueOrThrow({
+  const {
+    itinerary: { trains: trainSnapshotBefore },
+  } = await prisma.alert.findUniqueOrThrow({
     where: { id: alert.id },
-    select: { trains: true },
+    select: {
+      itinerary: {
+        include: {
+          trains: {
+            where: {
+              freePlaces: {
+                gt: 0,
+              },
+            },
+          },
+        },
+      },
+    },
   });
   try {
     await getAndCacheMaxableTrains(alert);
@@ -23,12 +37,28 @@ export async function processAlert(alert: Alert) {
       await bot.api.sendMessage(alert.uid, deletionAlert(alert), {
         parse_mode: "HTML",
       });
+    } else {
+      logger.warn({ alert, err }, "Cannot reach Max Planner");
     }
     return;
   }
-  const { trains: trainSnapshotAfter } = await prisma.alert.findUniqueOrThrow({
+  const {
+    itinerary: { trains: trainSnapshotAfter },
+  } = await prisma.alert.findUniqueOrThrow({
     where: { id: alert.id },
-    select: { trains: true },
+    select: {
+      itinerary: {
+        include: {
+          trains: {
+            where: {
+              freePlaces: {
+                gt: 0,
+              },
+            },
+          },
+        },
+      },
+    },
   });
   const newTrains = trainSnapshotAfter.filter(
     (newTrain) =>
@@ -64,17 +94,11 @@ export async function processAlert(alert: Alert) {
   }
 }
 
-export async function processAlerts(where?: {
-  select?: Prisma.AlertSelect | null | undefined;
-  include?: Prisma.AlertInclude | null | undefined;
-  where?: Prisma.AlertWhereInput | undefined;
-  orderBy?: Prisma.Enumerable<Prisma.AlertOrderByWithRelationInput> | undefined;
-  cursor?: Prisma.AlertWhereUniqueInput | undefined;
-  take?: number | undefined;
-  skip?: number | undefined;
-  distinct?: Prisma.Enumerable<Prisma.AlertScalarFieldEnum> | undefined;
-}) {
-  const alerts = await prisma.alert.findMany(where);
+export async function processAlerts(where?: Prisma.AlertWhereInput) {
+  const alerts = await prisma.alert.findMany({
+    where,
+    include: { itinerary: true },
+  });
   for (const alert of alerts) {
     logger.info({ alert }, "Processing alert");
     await processAlert(alert);
@@ -106,9 +130,7 @@ export async function alertLoop() {
 export async function processUserAlerts(uid: number) {
   logger.info({ uid }, "Processing user alerts");
   await processAlerts({
-    where: {
-      uid,
-    },
+    uid,
   });
 }
 

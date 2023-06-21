@@ -1,8 +1,7 @@
 import { InfluxDB, Point, WriteApi } from "@influxdata/influxdb-client";
-import { Train } from "@prisma/client";
 import { differenceInSeconds } from "date-fns";
 import { logger } from "../utils/logger.js";
-import { prisma } from "./prisma.js";
+import { TrainWithItinerary, prisma } from "./prisma.js";
 
 let api: WriteApi;
 
@@ -27,12 +26,12 @@ export function initInflux() {
   api = client.getWriteApi(process.env.INFLUX_ORG, process.env.INFLUX_BUCKET);
 }
 
-function TrainToTrainPoint(train: Train) {
+function TrainToTrainPoint(train: TrainWithItinerary) {
   return new Point("train")
     .tag("name", `${train.equipment}${train.number}`)
     .tag("departure", new Date(train.departure).toISOString())
-    .tag("origin", train.originId)
-    .tag("destination", train.destinationId)
+    .tag("origin", train.itinerary.originId)
+    .tag("destination", train.itinerary.destinationId)
     .intField("free_places", train.freePlaces)
     .intField(
       "time_before_leaving",
@@ -51,6 +50,9 @@ export async function saveTrains(trainsIDs: number[] = []) {
     }
 
     const trains = await prisma.train.findMany({
+      include: {
+        itinerary: true,
+      },
       where: {
         departure: {
           gte: new Date(),

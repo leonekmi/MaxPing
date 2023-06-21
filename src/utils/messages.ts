@@ -1,9 +1,9 @@
-import { Alert, Train } from "@prisma/client";
 import { format, startOfHour } from "date-fns";
 import fr from "date-fns/locale/fr/index.js";
-import { AlertWithTrains } from "../api/prisma.js";
+import { AlertWithTrains, AlertWithItinerary } from "../api/prisma.js";
 import { getStationLabel } from "../api/stations.js";
 import { MaxPlannerError } from "./errors.js";
+import { Itinerary, Train } from "@prisma/client";
 
 const plural = (v: number, s?: string) => (v > 1 ? s || "s" : "");
 
@@ -24,16 +24,16 @@ export const alertSkeleton = (
       )}`
     : "");
 
-export const trainSkeleton = (train: Train) => `🚄 ${train.equipment} ${
-  train.number
-}
+export const trainSkeleton = (train: Train, itinerary: Itinerary) => `🚄 ${
+  train.equipment
+} ${train.number}
 🕑 Départ ${format(train.departure, "HH:mm")} - Arrivée ${format(
   train.arrival,
   "HH:mm"
 )}
 💻 <a href="https://www.sncf-connect.com/app/fr-FR/redirect?redirection_type=SEARCH&origin_transporter_code=${
-  train.originId
-}&destination_transporter_code=${train.destinationId}&outward_date=${format(
+  itinerary.originId
+}&destination_transporter_code=${itinerary.destinationId}&outward_date=${format(
   startOfHour(train.departure),
   "yyyy-MM-dd-HH-mm"
 )}">Réserver le train sur SNCF Connect</a>`;
@@ -45,25 +45,20 @@ Pour commencer, précisez-moi la gare de départ de l'alerte.
 ${alertSkeleton("<i><b>Gare de départ</b></i>")}`;
 
 export const createAlertStep2 = (
-  alert: Partial<Alert>
-) => `✏️ C'est noté pour ${getStationLabel(alert.origin)} !
+  origin: string
+) => `✏️ C'est noté pour ${getStationLabel(origin)} !
 Où va-t-on ? Dites-moi !
 <i>Il me faut le code résarail, en 5 lettres (FRXXX)</i>
 
-${alertSkeleton(
-  getStationLabel(alert.origin),
-  "<i><b>Gare d'arrivée</b></i>"
-)}`;
+${alertSkeleton(getStationLabel(origin), "<i><b>Gare d'arrivée</b></i>")}`;
 
 export const createAlertStep3 = (
-  alert: Partial<Alert>
+  origin: string,
+  destination: string
 ) => `🗒️ Notre itinéraire est fait !
 Quel jour voulez-vous surveiller ?
 
-${alertSkeleton(
-  getStationLabel(alert.origin),
-  getStationLabel(alert.destination)
-)}`;
+${alertSkeleton(getStationLabel(origin), getStationLabel(destination))}`;
 
 export const cancelMessage = "🚫 La création d'alerte a été annulée";
 
@@ -84,7 +79,7 @@ export const noTrainsMessage = `🧭 Il n'existe aucune connexion entre ces 2 ga
 export const trainsPending = "⏳ Je cherche les trains Max...";
 
 export const createAlertStep4 = (
-  alert: Partial<Alert>,
+  alert: Partial<AlertWithItinerary>,
   trainCount: number
 ) => `✅ C'est tout bon !
 J'ai trouvé ${trainCount} train${plural(
@@ -92,8 +87,8 @@ J'ai trouvé ${trainCount} train${plural(
 )}, si jamais un nouveau train apparaît, vous serez notifié.
 
 ${alertSkeleton(
-  getStationLabel(alert.origin),
-  getStationLabel(alert.destination),
+  getStationLabel(alert.itinerary?.originId),
+  getStationLabel(alert.itinerary?.destinationId),
   alert.date?.toLocaleDateString("fr")
 )}`;
 
@@ -106,10 +101,10 @@ ${
           (alert, index) =>
             `🔔 Alerte n°${index + 1}
 ${alertSkeleton(
-  getStationLabel(alert.origin),
-  getStationLabel(alert.destination),
+  getStationLabel(alert.itinerary?.originId),
+  getStationLabel(alert.itinerary?.destinationId),
   alert.date.toLocaleDateString("fr"),
-  alert.trains.length
+  alert.itinerary.trains.length
 )}`
         )
         .join("\n\n")
@@ -117,35 +112,40 @@ ${alertSkeleton(
 }`;
 
 // At least one train
-export const trainAlert = (trains: [Train, ...Train[]], alert: Alert) =>
+export const trainAlert = (
+  trains: [Train, ...Train[]],
+  alert: AlertWithItinerary
+) =>
   `❗ ${trains.length} nouveau${plural(trains.length, "x")} train${plural(
     trains.length
-  )} <b>${getStationLabel(alert.origin)} ➡️ ${getStationLabel(
-    alert.destination
+  )} <b>${getStationLabel(alert.itinerary.originId)} ➡️ ${getStationLabel(
+    alert.itinerary.destinationId
   )}</b> pour le <b>${format(alert.date, "d MMMM", { locale: fr })}</b> !
 
-${trains.map(trainSkeleton).join("\n\n")}`;
+${trains.map((train) => trainSkeleton(train, alert.itinerary)).join("\n\n")}`;
 
 export const showAlert = (
   alert: AlertWithTrains,
   index = 1
 ) => `🔔 Alerte n°${index}
 ${alertSkeleton(
-  getStationLabel(alert.origin),
-  getStationLabel(alert.destination),
+  getStationLabel(alert.itinerary.originId),
+  getStationLabel(alert.itinerary.destinationId),
   alert.date.toLocaleDateString("fr"),
-  alert.trains.length
+  alert.itinerary.trains.length
 )}
 
-${alert.trains.map(trainSkeleton).join("\n\n")}`;
+${alert.itinerary.trains
+  .map((train) => trainSkeleton(train, alert.itinerary))
+  .join("\n\n")}`;
 
 export const deletionAlert = (
-  alert: Alert
+  alert: AlertWithItinerary
 ) => `🧭 Une alerte a été supprimée, car elle ne comprend aucun itinéraire possible.
 
 ${alertSkeleton(
-  getStationLabel(alert.origin),
-  getStationLabel(alert.destination),
+  getStationLabel(alert.itinerary.originId),
+  getStationLabel(alert.itinerary.destinationId),
   alert.date.toLocaleDateString("fr"),
   0
 )}

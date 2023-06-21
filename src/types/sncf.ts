@@ -38,6 +38,7 @@ export interface MaxableTrainsResponsePayload {
 export enum MaxErrors {
   NO_AVAIL = "SYG_40415",
   NO_OD = "SYG_40416",
+  RATE_EXCEEDED = "SYG_50000",
 }
 
 export interface MaxableTrainsErrorPayload {
