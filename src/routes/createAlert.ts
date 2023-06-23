@@ -12,7 +12,7 @@ import { Alert } from "@prisma/client";
 import { type Bot } from "grammy";
 import { gare, remove_keyboard } from "../utils/markups.js";
 import { getDateButtons, keyboardButtonToDate } from "../utils/date.js";
-import { getAndCacheMaxableTrains } from "../api/max_planner.js";
+import { getAndStoreMaxableTrains } from "../api/max_planner.js";
 import { availableStationsCodes, getStations } from "../api/stations.js";
 import { logger } from "../utils/logger.js";
 import { MaxPlannerError } from "../utils/errors.js";
@@ -27,6 +27,7 @@ import type {
   AugmentedContext,
   AugmentedConversation,
 } from "../types/grammy.js";
+import { prisma } from "../api/prisma.js";
 
 async function askStationCode(
   conversation: AugmentedConversation
@@ -64,16 +65,13 @@ const createAlert: ConversationFn<AugmentedContext> =
       parse_mode: "HTML",
       reply_markup: gare,
     });
-    const alert: Partial<Alert> = {
-      uid: ctx.chat?.id,
-    };
-    alert.origin = await askStationCode(conversation);
-    await ctx.reply(createAlertStep2(alert), {
+    const origin = await askStationCode(conversation);
+    await ctx.reply(createAlertStep2(origin), {
       parse_mode: "HTML",
       reply_markup: gare,
     });
-    alert.destination = await askStationCode(conversation);
-    await ctx.reply(createAlertStep3(alert), {
+    const destination = await askStationCode(conversation);
+    await ctx.reply(createAlertStep3(origin, destination), {
       parse_mode: "HTML",
       reply_markup: {
         keyboard: getDateButtons(),
@@ -81,16 +79,23 @@ const createAlert: ConversationFn<AugmentedContext> =
         one_time_keyboard: true,
       },
     });
-    alert.date = await askDate(conversation);
+    const date = await askDate(conversation);
     const loadingMessage = await ctx.reply(trainsPending, {
       reply_markup: remove_keyboard,
     });
     await ctx.replyWithChatAction("typing");
     await conversation.external(async () => {
       try {
-        const [trains, alertId] = await getAndCacheMaxableTrains(
-          alert as Required<Alert>
-        );
+        if (!ctx.chat?.id) return;
+        const alert = await prisma.alert.create({
+          data: {
+            uid: ctx.chat.id,
+            date,
+            destination,
+            origin,
+          },
+        });
+        const trains = await getAndStoreMaxableTrains(alert);
         logger.info({ trains }, "Alert (first) processed!");
         await ctx.reply(createAlertStep4(alert, trains.length), {
           parse_mode: "HTML",
@@ -99,7 +104,7 @@ const createAlert: ConversationFn<AugmentedContext> =
               [
                 {
                   text: "🚄 Voir les trains",
-                  callback_data: "show-alert-" + alertId,
+                  callback_data: "show-alert-" + alert.id,
                 },
                 { text: "🔎 Voir vos alertes", callback_data: "show-alerts" },
               ],

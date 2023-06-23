@@ -31,8 +31,8 @@ function TrainToTrainPoint(train: Train) {
   return new Point("train")
     .tag("name", `${train.equipment}${train.number}`)
     .tag("departure", new Date(train.departure).toISOString())
-    .tag("origin", train.originId)
-    .tag("destination", train.destinationId)
+    .tag("origin", train.origin)
+    .tag("destination", train.destination)
     .intField("free_places", train.freePlaces)
     .intField(
       "time_before_leaving",

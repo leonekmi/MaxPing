@@ -32,8 +32,8 @@ export const trainSkeleton = (train: Train) => `🚄 ${train.equipment} ${
   "HH:mm"
 )}
 💻 <a href="https://www.sncf-connect.com/app/fr-FR/redirect?redirection_type=SEARCH&origin_transporter_code=${
-  train.originId
-}&destination_transporter_code=${train.destinationId}&outward_date=${format(
+  train.origin
+}&destination_transporter_code=${train.destination}&outward_date=${format(
   startOfHour(train.departure),
   "yyyy-MM-dd-HH-mm"
 )}">Réserver le train sur SNCF Connect</a>`;
@@ -45,25 +45,20 @@ Pour commencer, précisez-moi la gare de départ de l'alerte.
 ${alertSkeleton("<i><b>Gare de départ</b></i>")}`;
 
 export const createAlertStep2 = (
-  alert: Partial<Alert>
-) => `✏️ C'est noté pour ${getStationLabel(alert.origin)} !
+  origin: string
+) => `✏️ C'est noté pour ${getStationLabel(origin)} !
 Où va-t-on ? Dites-moi !
 <i>Il me faut le code résarail, en 5 lettres (FRXXX)</i>
 
-${alertSkeleton(
-  getStationLabel(alert.origin),
-  "<i><b>Gare d'arrivée</b></i>"
-)}`;
+${alertSkeleton(getStationLabel(origin), "<i><b>Gare d'arrivée</b></i>")}`;
 
 export const createAlertStep3 = (
-  alert: Partial<Alert>
+  origin: string,
+  destination: string
 ) => `🗒️ Notre itinéraire est fait !
 Quel jour voulez-vous surveiller ?
 
-${alertSkeleton(
-  getStationLabel(alert.origin),
-  getStationLabel(alert.destination)
-)}`;
+${alertSkeleton(getStationLabel(origin), getStationLabel(destination))}`;
 
 export const cancelMessage = "🚫 La création d'alerte a été annulée";
 
@@ -150,7 +145,7 @@ ${alertSkeleton(
   0
 )}
 
-• Seuls les Intercités À Réservation Obligatoire (Intercités ARO), TGV INOUI et les trains OUIGO (à partir du 10 mai 2023) sont éligibles avec l'abonnement MAX JEUNE / SENIOR.
+• Seuls les Intercités À Réservation Obligatoire (Intercités ARO), TGV INOUI et les trains OUIGO Grande Vitesse sont éligibles avec l'abonnement MAX JEUNE / SENIOR.
 • Vérifiez sur une application de réservation que votre itinéraire est possible sans correspondances, <i>MaxPing ne gère pas les correspondances</i>.
 
 <i>MaxPing est désormais capable de détecter un itinéraire qui ne comprend aucun train éligible et prévenir l'utilisateur si tel est le cas. Si vous pensez que cette détection est erronée, merci de contacter @leonekmi avec une copie de ce message.</i>`;
