@@ -149,3 +149,22 @@ ${alertSkeleton(
 • Vérifiez sur une application de réservation que votre itinéraire est possible sans correspondances, <i>MaxPing ne gère pas les correspondances</i>.
 
 <i>MaxPing est désormais capable de détecter un itinéraire qui ne comprend aucun train éligible et prévenir l'utilisateur si tel est le cas. Si vous pensez que cette détection est erronée, merci de contacter @leonekmi avec une copie de ce message.</i>`;
+
+export const howToUseFavoritesStations = `💖 Ajoutez des gares dans vos gares préférées pour les voir apparaître plus vite dans les menus de création d'alerte.
+
+Utilisez /add_favorite et /remove_favorite pour gérer vos gares préférées.`;
+
+export const addAStationToFavorites = `⭐ Une nouvelle gare préférée ? Sélectionnez une gare à ajouter avec la recherche.`;
+
+export const removeAStationFromFavorites = `💔 Au revoir, très chère gare. Sélectionnez une gare à retirer de vos gares préférées avec le menu.`;
+
+export const stationAddedToFavorites = (station: string) =>
+  `💫 <b>${getStationLabel(
+    station
+  )}</b> fait désormais partie de vos gares préférées.
+<i>Elle apparaîtra dans le menu au moment de créer une alerte.</i>`;
+
+export const stationRemovedFromFavorites = (station: string) =>
+  `❎ <b>${getStationLabel(
+    station
+  )}</b> ne fait plus partie de vos gares préférées.`;

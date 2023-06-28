@@ -1,14 +1,15 @@
 import { config } from "dotenv";
 import { Bot, session } from "grammy";
-import { welcomeMessage } from "./utils/messages.js";
+import { cancelMessage, welcomeMessage } from "./utils/messages.js";
 import createAlert from "./routes/createAlert.js";
 import showAlerts from "./routes/showAlerts.js";
 import alerting from "./routes/alerting.js";
 import { logger } from "./utils/logger.js";
 import { initInflux } from "./api/influxdb.js";
 import { AugmentedContext } from "./types/grammy.js";
-import { PrismaAdapter } from "@grammyjs/storage-prisma";
-import { prisma } from "./api/prisma.js";
+import { FixedPrismaAdapter, prisma } from "./api/prisma.js";
+import favorites from "./routes/favorites.js";
+import { conversations } from "@grammyjs/conversations";
 
 config();
 
@@ -24,9 +25,24 @@ export const bot = new Bot<AugmentedContext>(process.env.BOT_TOKEN);
 // Add session and conversations support
 
 bot.use(
-  session<Record<string, never>, AugmentedContext>({
-    initial: () => ({}),
-    storage: new PrismaAdapter(prisma.grammYSession),
+  session({
+    type: "multi",
+    favorites: {
+      getSessionKey(ctx) {
+        return `user/favorites/${ctx.from?.id}`;
+      },
+      initial: () => ({
+        favoriteStations: [],
+      }),
+      storage: new FixedPrismaAdapter(prisma.grammYSession),
+    },
+    conversation: {
+      getSessionKey(ctx) {
+        if (!ctx.chat?.id) return undefined;
+        return `chat/conversation/${ctx.chat?.id}`;
+      },
+      storage: new FixedPrismaAdapter(prisma.grammYSession),
+    },
   })
 );
 
@@ -44,8 +60,15 @@ bot.catch((err) => {
   return;
 });
 
-bot.command("start", async (ctx) => {
+bot.command("start", async (ctx, next) => {
+  // this middleware does not handle deep-links
+  if (ctx.match) return next();
   await ctx.reply(welcomeMessage, { parse_mode: "HTML" });
+});
+
+bot.use(conversations()).command("cancel", async (ctx) => {
+  await ctx.conversation.exit();
+  await ctx.reply(cancelMessage);
 });
 
 // Handling alert creation
@@ -56,6 +79,9 @@ showAlerts(bot);
 
 // Processing loop for alerts
 alerting(bot);
+
+// Favorites
+favorites(bot);
 
 void bot.start();
 

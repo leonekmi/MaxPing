@@ -14,7 +14,7 @@ import { MaxPlannerError } from "../utils/errors.js";
 const client = got.extend({
   headers: {
     "x-client-app": "MAX_JEUNE",
-    "x-client-app-version": "1.38.2",
+    "x-client-app-version": "1.45.3",
     "x-distribution-channel": "TRAINLINE",
     // "x-syg-correlation-id": "24c77428-858e-43b4-a90c-76cd35d16917",
     "User-Agent":

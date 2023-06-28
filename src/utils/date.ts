@@ -7,7 +7,7 @@ import {
   parse,
 } from "date-fns";
 import fr from "date-fns/locale/fr/index.js";
-import { KeyboardButton } from "grammy/out/types.node";
+import { KeyboardButton } from "grammy/types";
 
 const formatStr = "EEE d MMMM yyyy";
 

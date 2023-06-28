@@ -1,13 +1,12 @@
 import {
+  InlineKeyboardButton,
   InlineKeyboardMarkup,
   ReplyKeyboardRemove,
-} from "grammy/out/types.node.js";
+} from "grammy/types";
 
-export const gare: InlineKeyboardMarkup = {
-  inline_keyboard: [
-    [{ text: "Chercher une gare", switch_inline_query_current_chat: "" }],
-  ],
-};
+export const search_gare: InlineKeyboardButton[] = [
+  { text: "Chercher une gare", switch_inline_query_current_chat: "" },
+];
 
 export const remove_keyboard: ReplyKeyboardRemove = {
   remove_keyboard: true,

@@ -1,6 +1,19 @@
+import { PrismaAdapter } from "@grammyjs/storage-prisma";
 import { Alert, PrismaClient, Train } from "@prisma/client";
 
 export const prisma = new PrismaClient();
+
+// Extend the Prisma Adapter from grammY
+// https://github.com/grammyjs/storages/pull/186
+export class FixedPrismaAdapter<T> extends PrismaAdapter<T> {
+  async delete(key: string) {
+    super.delete(key).catch((err) => {
+      // Record does not exist in database
+      if (err?.code === "P2025") return;
+      return Promise.reject(err);
+    });
+  }
+}
 
 export type AlertWithTrains = Alert & {
   trains: Train[];

@@ -1,6 +1,5 @@
 import {
   alertErrorMessage,
-  cancelMessage,
   createAlertStep1,
   createAlertStep2,
   createAlertStep3,
@@ -8,18 +7,16 @@ import {
   noTrainsMessage,
   trainsPending,
 } from "../utils/messages.js";
-import { Alert } from "@prisma/client";
 import { type Bot } from "grammy";
-import { gare, remove_keyboard } from "../utils/markups.js";
+import { remove_keyboard } from "../utils/markups.js";
 import { getDateButtons, keyboardButtonToDate } from "../utils/date.js";
 import { getAndStoreMaxableTrains } from "../api/max_planner.js";
-import { availableStationsCodes, getStations } from "../api/stations.js";
+import { getStationLabel, getStations } from "../api/stations.js";
 import { logger } from "../utils/logger.js";
 import { MaxPlannerError } from "../utils/errors.js";
 import { MaxErrors } from "../types/sncf.js";
 
 import {
-  conversations,
   createConversation,
   type ConversationFn,
 } from "@grammyjs/conversations";
@@ -28,21 +25,8 @@ import type {
   AugmentedConversation,
 } from "../types/grammy.js";
 import { prisma } from "../api/prisma.js";
-
-async function askStationCode(
-  conversation: AugmentedConversation
-): Promise<string> {
-  for (;;) {
-    const ctx = await conversation.waitForHears(/^(?:[A-Z]{5})/);
-    if (!ctx.chat || !ctx.message || !ctx.message.text) continue; // Channel updates, someone quits, etc.
-    const pendingCode = ctx.message.text.slice(0, 5);
-    if (!availableStationsCodes.includes(pendingCode)) {
-      await ctx.reply("Merci de rentrer un code gare valide");
-      continue;
-    }
-    return pendingCode;
-  }
-}
+import { InlineQueryResult } from "grammy/types";
+import { askStationCode, generateStations } from "../utils/conversation.js";
 
 async function askDate(conversation: AugmentedConversation): Promise<Date> {
   for (;;) {
@@ -63,12 +47,12 @@ const createAlert: ConversationFn<AugmentedContext> =
   async function createAlert(conversation, ctx) {
     await ctx.reply(createAlertStep1, {
       parse_mode: "HTML",
-      reply_markup: gare,
+      reply_markup: generateStations(ctx),
     });
     const origin = await askStationCode(conversation);
     await ctx.reply(createAlertStep2(origin), {
       parse_mode: "HTML",
-      reply_markup: gare,
+      reply_markup: generateStations(ctx),
     });
     const destination = await askStationCode(conversation);
     await ctx.reply(createAlertStep3(origin, destination), {
@@ -84,19 +68,30 @@ const createAlert: ConversationFn<AugmentedContext> =
       reply_markup: remove_keyboard,
     });
     await ctx.replyWithChatAction("typing");
+    const alert = await conversation.external(() => {
+      if (!ctx.chat?.id) return;
+      return prisma.alert.create({
+        data: {
+          uid: ctx.chat.id,
+          date,
+          destination,
+          origin,
+        },
+      });
+    });
+    if (!alert) return;
     await conversation.external(async () => {
       try {
-        if (!ctx.chat?.id) return;
-        const alert = await prisma.alert.create({
-          data: {
-            uid: ctx.chat.id,
-            date,
-            destination,
-            origin,
-          },
-        });
         const trains = await getAndStoreMaxableTrains(alert);
         logger.info({ trains }, "Alert (first) processed!");
+        const isOriginInFavorites =
+          conversation.session.favorites.favoriteStations?.includes(
+            alert.origin
+          );
+        const isDestinationInFavorites =
+          conversation.session.favorites.favoriteStations?.includes(
+            alert.destination
+          );
         await ctx.reply(createAlertStep4(alert, trains.length), {
           parse_mode: "HTML",
           reply_markup: {
@@ -108,7 +103,27 @@ const createAlert: ConversationFn<AugmentedContext> =
                 },
                 { text: "🔎 Voir vos alertes", callback_data: "show-alerts" },
               ],
-            ],
+              !isOriginInFavorites
+                ? [
+                    {
+                      text: `⭐ Ajouter ${getStationLabel(
+                        alert.origin
+                      )} aux favoris`,
+                      callback_data: `add-favorite-${alert.origin}`,
+                    },
+                  ]
+                : undefined,
+              !isDestinationInFavorites
+                ? [
+                    {
+                      text: `⭐ Ajouter ${getStationLabel(
+                        alert.destination
+                      )} aux favoris`,
+                      callback_data: `add-favorite-${alert.destination}`,
+                    },
+                  ]
+                : undefined,
+            ].filter(Array.isArray),
           },
         });
       } catch (err) {
@@ -128,6 +143,9 @@ const createAlert: ConversationFn<AugmentedContext> =
         } else {
           logger.error({ err }, "Unexpected error");
         }
+        await prisma.alert.delete({
+          where: { id: alert.id },
+        });
       } finally {
         await ctx.api.deleteMessage(
           loadingMessage.chat.id,
@@ -137,29 +155,63 @@ const createAlert: ConversationFn<AugmentedContext> =
     });
   };
 
+const createInlineQueryResult = ([codeStation, station, isFavorite]: [
+  string,
+  string,
+  boolean,
+]): InlineQueryResult => ({
+  type: "article",
+  id: codeStation,
+  title: isFavorite ? `⭐ ${station}` : station,
+  description: codeStation,
+  reply_markup: {
+    inline_keyboard: [],
+  },
+  input_message_content: {
+    message_text: `${codeStation}/${station}`,
+  },
+});
+
+const sortStations = (
+  [, aStation, isAFavorite]: [string, string, boolean],
+  [, bStation, isBFavorite]: [string, string, boolean]
+) => {
+  if (isAFavorite && !isBFavorite) {
+    return -1;
+  } else if (!isAFavorite && isBFavorite) {
+    return 1;
+  }
+  return aStation.localeCompare(bStation);
+};
+
 export default function (bot: Bot<AugmentedContext>) {
   bot.on("inline_query", async (ctx) => {
+    const favoriteStations = ctx.session.favorites.favoriteStations || [];
     await ctx.answerInlineQuery(
-      ctx.inlineQuery.query.length > 2
-        ? getStations(ctx.inlineQuery.query).map((r) => ({
-            type: "article",
-            id: r.codeStation,
-            title: r.station,
-            description: r.codeStation,
-            input_message_content: {
-              message_text: `${r.codeStation}/${r.station}`,
-            },
-          }))
-        : [],
+      (ctx.inlineQuery.query.length > 0
+        ? getStations(ctx.inlineQuery.query).map<
+            Parameters<typeof createInlineQueryResult>[0]
+          >((r) => [
+            r.codeStation,
+            r.station,
+            favoriteStations.includes(r.codeStation),
+          ])
+        : favoriteStations.map<Parameters<typeof createInlineQueryResult>[0]>(
+            (stationCode) => [stationCode, getStationLabel(stationCode), true]
+          )
+      )
+        .sort(sortStations)
+        .map(createInlineQueryResult)
+        .slice(0, 50), // Telegram allows only 50 results,
       {
         next_offset: "",
+        is_personal: true,
+        button: {
+          text: "Gérer vos gares préférées",
+          start_parameter: "favorites-help",
+        },
       }
     );
-  });
-
-  bot.use(conversations()).command("cancel", async (ctx) => {
-    await ctx.conversation.exit();
-    await ctx.reply(cancelMessage);
   });
 
   bot
