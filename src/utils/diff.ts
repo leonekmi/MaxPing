@@ -1,4 +1,4 @@
-import { Alert, Prisma, Train } from "@prisma/client";
+import { Alert, Prisma } from "@prisma/client";
 import { bot } from "../index.js";
 import { dropAlert, prisma } from "../api/prisma.js";
 import { getAndStoreMaxableTrains } from "../api/max_planner.js";
@@ -27,7 +27,7 @@ export async function processAlert(alert: Alert) {
   }
   const { trains: trainSnapshotAfter } = await prisma.alert.findUniqueOrThrow({
     where: { id: alert.id },
-    select: { trains: { select: { id: true } } },
+    select: { trains: true },
   });
   const newTrains = trainSnapshotAfter.filter(
     (newTrain) =>
@@ -37,29 +37,25 @@ export async function processAlert(alert: Alert) {
   );
   logger.info({ newTrains }, "Alert processed!");
   if (newTrains.length > 0) {
-    await bot.api.sendMessage(
-      alert.uid,
-      trainAlert(newTrains as [Train, ...Train[]], alert),
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "❌ Supprimer cette alerte",
-                callback_data: "delete-alert-" + alert.id,
-              },
-            ],
-            [
-              {
-                text: "🔎 Voir tous les trains de l'alerte",
-                callback_data: "show-alert-" + alert.id,
-              },
-            ],
+    await bot.api.sendMessage(alert.uid, trainAlert(newTrains, alert), {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "❌ Supprimer cette alerte",
+              callback_data: "delete-alert-" + alert.id,
+            },
           ],
-        },
-      }
-    );
+          [
+            {
+              text: "🔎 Voir tous les trains de l'alerte",
+              callback_data: "show-alert-" + alert.id,
+            },
+          ],
+        ],
+      },
+    });
   }
 }
 

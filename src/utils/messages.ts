@@ -112,7 +112,7 @@ ${alertSkeleton(
 }`;
 
 // At least one train
-export const trainAlert = (trains: [Train, ...Train[]], alert: Alert) =>
+export const trainAlert = (trains: Train[], alert: Alert) =>
   `❗ ${trains.length} nouveau${plural(trains.length, "x")} train${plural(
     trains.length
   )} <b>${getStationLabel(alert.origin)} ➡️ ${getStationLabel(
